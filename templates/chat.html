@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2>Chat</h2>
+
+<div style="height:300px; overflow-y:scroll; background:white; padding:10px;">
+    {% for m in messages %}
+        <p><strong>{{ m.sender_id }}:</strong> {{ m.message }}</p>
+    {% endfor %}
+</div>
+
+<form method="POST">
+    <input name="message" style="width:80%; padding:10px;">
+    <button class="btn">Send</button>
+</form>
+
+{% endblock %}

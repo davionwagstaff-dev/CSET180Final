@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body {
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    background:#f5f7fa;
+    font-family:sans-serif;
+}
+.box {
+    background:white;
+    padding:30px;
+    border-radius:10px;
+    width:300px;
+}
+input {
+    width:100%;
+    padding:10px;
+    margin:10px 0;
+}
+button {
+    width:100%;
+    padding:10px;
+    background:black;
+    color:white;
+    border:none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="box">
+    <h2>Login</h2>
+
+    <form method="POST">
+        <input name="login" placeholder="Email or Username">
+        <input name="password" type="password" placeholder="Password">
+        <button>Login</button>
+    </form>
+
+    <p><a href="/register">Create account</a></p>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2>Your Orders</h2>
+
+{% for o in orders %}
+<div class="card">
+    <h3>Order #{{ o.id }}</h3>
+    <p>Total: ${{ o.total_price }}</p>
+    <p>Status: {{ o.status }}</p>
+</div>
+{% endfor %}
+
+{% endblock %}

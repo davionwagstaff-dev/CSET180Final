@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card">
+    <h2>{{ product.title }}</h2>
+    <p>{{ product.description }}</p>
+
+    {% if product.old_price %}
+        <p>
+            <span style="text-decoration: line-through;">${{ product.old_price }}</span>
+            <strong>${{ product.price }}</strong>
+        </p>
+    {% else %}
+        <p>${{ product.price }}</p>
+    {% endif %}
+
+    <form method="POST" action="/add-to-cart">
+        <input type="hidden" name="product_id" value="{{ product.id }}">
+
+        <label>Quantity:</label>
+        <input type="number" name="quantity" value="1">
+
+        <br><br>
+        <button class="btn">Add to Cart</button>
+    </form>
+</div>
+
+<br>
+
+<h3>Reviews</h3>
+
+{% for r in reviews %}
+<div class="card">
+    <strong>{{ r.name }}</strong> ⭐ {{ r.rating }}
+    <p>{{ r.description }}</p>
+</div>
+{% endfor %}
+
+<br>
+
+<form method="POST" action="/add-review">
+    <input type="hidden" name="product_id" value="{{ product.id }}">
+    <input name="rating" placeholder="Rating (1-5)">
+    <input name="description" placeholder="Write review">
+    <button class="btn">Submit</button>
+</form>
+
+{% endblock %}
