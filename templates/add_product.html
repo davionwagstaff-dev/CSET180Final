@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2>Add Product</h2>
+
+<form method="POST">
+    <input name="title" placeholder="Title" required><br><br>
+    <input name="description" placeholder="Description"><br><br>
+    <input name="price" placeholder="Price"><br><br>
+    <input name="inventory" placeholder="Inventory"><br><br>
+    <input name="category_id" placeholder="Category ID"><br><br>
+
+    <label>Image filename (from /static/images/):</label>
+    <input name="image" placeholder="example: shoe.jpg"><br><br>
+
+    <button class="btn">Add Product</button>
+</form>
+
+{% endblock %}

@@ -3,6 +3,8 @@
 {% block content %}
 
 <div class="card">
+    <img src="{{ url_for('static', filename='images/' + (product.image_url or 'default.png')) }}" 
+     style="width:300px;">
     <h2>{{ product.title }}</h2>
     <p>{{ product.description }}</p>
 
