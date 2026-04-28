@@ -92,28 +92,6 @@ def product_page(id):
 
     return render_template('product.html', product=product, reviews=reviews)
 
-@app.route('/add-product', methods=['GET', 'POST'])
-def add_product():
-    if session.get('role') not in ['vendor', 'admin']:
-        return "Unauthorized"
-
-    if request.method == 'POST':
-        data = request.form
-
-        with engine.connect() as conn:
-            conn.execute(text("""
-                INSERT INTO products 
-                (vendor_id, title, description, price, inventory, category_id)
-                VALUES (:vendor_id, :title, :description, :price, :inventory, :category_id)
-            """), {
-                **data,
-                "vendor_id": session['user_id']
-            })
-            conn.commit()
-
-        return redirect('/')
-
-    return render_template('add_product.html')
 
 @app.route('/edit-product/<int:id>', methods=['GET', 'POST'])
 def edit_product(id):
