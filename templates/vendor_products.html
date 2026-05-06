@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<form method="POST" action="/delete-product/{{ p.id }}">
+    <button class="btn" style="background:red;"
+        onclick="return confirm('Delete this product?')">
+        Delete
+    </button>
+</form>
+
+{% endblock %}

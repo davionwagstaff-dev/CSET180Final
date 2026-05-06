@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 40px auto; padding: 20px;">
+    <a href="{{ url_for('orders') }}" style="text-decoration: none; color: #888;">← Back to My Orders</a>
+    
+    <div class="card" style="margin-top: 20px; padding: 30px; background: white; border-radius: 12px;">
+        <h2 style="margin: 0;">Order #{{ order.id }}</h2>
+        <p style="color: #888;">Placed on {{ order.created_at.strftime('%B %d, %Y') }}</p>
+        <span style="padding: 5px 15px; background: #2ecc71; color: white; border-radius: 20px; font-size: 0.8em; text-transform: uppercase;">
+            {{ order.status }}
+        </span>
+
+        <hr style="margin: 30px 0; border: 0; border-top: 1px solid #eee;">
+
+        <h3>Items</h3>
+        {% for item in items %}
+        <div style="display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #f9f9f9;">
+            <div>
+                <strong style="font-size: 1.1em;">{{ item.title }}</strong>
+                <p style="margin: 5px 0; color: #666; font-size: 0.9em;">
+                    Size: {{ item.size or 'N/A' }} | Color: {{ item.color or 'N/A' }}
+                </p>
+            </div>
+            <div style="text-align: right;">
+                <div>{{ item.quantity }} x ${{ "{:,.2f}".format(item.price) }}</div>
+                <div style="font-weight: bold;">${{ "{:,.2f}".format(item.price * item.quantity) }}</div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div style="margin-top: 30px; text-align: right;">
+            <h3 style="margin: 0; color: #7f8c8d;">Total Paid</h3>
+            <div style="font-size: 2em; font-weight: bold; color: #2c3e50;">
+                ${{ "{:,.2f}".format(order.total_price) }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

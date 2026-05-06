@@ -1,15 +1,45 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div style="max-width: 900px; margin: 40px auto; padding: 20px;">
+    <h2 style="margin-bottom: 30px; color: #2c3e50;">Your Order History</h2>
 
-<h2>Your Orders</h2>
+    {% for o in orders %}
+    <div class="card" style="padding: 25px; margin-bottom: 20px; background: white; border-radius: 12px; border-left: 6px solid #3498db; box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: 0.3s;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            
+            <div>
+                <h3 style="margin: 0; color: #34495e; font-size: 1.4rem;">Order #{{ o.id }}</h3>
+                <p style="margin: 8px 0; color: #95a5a6; font-size: 0.9rem;">
+                    Placed on: <strong>{{ o.created_at.strftime('%B %d, %Y') }}</strong>
+                </p>
+                <!-- Link to the detail page we built -->
+                <a href="{{ url_for('order_details', order_id=o.id) }}" style="color: #3498db; text-decoration: none; font-weight: bold; font-size: 0.9rem;">
+                    View Items & Details →
+                </a>
+            </div>
 
-{% for o in orders %}
-<div class="card">
-    <h3>Order #{{ o.id }}</h3>
-    <p>Total: ${{ o.total_price }}</p>
-    <p>Status: {{ o.status }}</p>
+            <div style="text-align: right;">
+                <div style="font-size: 1.6rem; font-weight: bold; color: #2ecc71;">
+                    ${{ "{:,.2f}".format(o.total_price) }}
+                </div>
+                <div style="margin-top: 10px;">
+                    <span style="padding: 6px 16px; border-radius: 20px; background: #ebf5fb; color: #3498db; font-size: 0.8rem; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;">
+                        {{ o.status }}
+                    </span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    {% else %}
+    <!-- Empty State -->
+    <div style="text-align: center; padding: 80px 20px; background: white; border-radius: 15px; border: 2px dashed #eee;">
+        <div style="font-size: 4rem; margin-bottom: 20px;">📦</div>
+        <h3 style="color: #7f8c8d;">You haven't placed any orders yet.</h3>
+        <p style="color: #bdc3c7; margin-bottom: 30px;">Time to fill that cart with something special!</p>
+        <a href="/" class="btn" style="background: #3498db; color: white; padding: 12px 40px; text-decoration: none; border-radius: 8px; font-weight: bold;">Browse Products</a>
+    </div>
+    {% endfor %}
 </div>
-{% endfor %}
-
 {% endblock %}

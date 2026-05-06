@@ -1,20 +1,93 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+    .selector-input { display: none; }
+    .selector-label {
+        display: inline-block;
+        padding: 8px 16px;
+        margin: 5px;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        background: white;
+        cursor: pointer;
+        transition: 0.2s;
+        font-size: 14px;
+    }
+    .selector-input:checked + .selector-label {
+        background: black;
+        color: white;
+        border-color: black;
+    }
+    .selector-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+    .input-field { width: 95%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 8px; }
+</style>
 
-<h2>Add Product</h2>
+<div class="card" style="max-width: 650px; margin: auto;">
+    <h2>Add New Product</h2>
+    <form action="/add-product" method="POST" enctype="multipart/form-data">
+        
+        <!-- Category Selection -->
+        <div style="margin-bottom: 25px;">
+            <label><strong>Select Category</strong></label>
+            <div class="selector-container">
+                {% for cat in categories %}
+                    <input type="radio" name="category_id" id="cat_{{ cat.id }}" value="{{ cat.id }}" class="selector-input" required>
+                    <label for="cat_{{ cat.id }}" class="selector-label">{{ cat.name }}</label>
+                {% endfor %}
+            </div>
+        </div>
 
-<form method="POST">
-    <input name="title" placeholder="Title" required><br><br>
-    <input name="description" placeholder="Description"><br><br>
-    <input name="price" placeholder="Price"><br><br>
-    <input name="inventory" placeholder="Inventory"><br><br>
-    <input name="category_id" placeholder="Category ID"><br><br>
+        {% if session.get('role') == 'admin' %}
+        <div style="margin-bottom: 25px;">
+            <label><strong>Assign to Vendor</strong></label>
+            <div class="selector-container">
+                {% for vendor in vendors %}
+                    <input type="radio" name="vendor_id" id="ven_{{ vendor.id }}" value="{{ vendor.id }}" class="selector-input" required>
+                    <label for="ven_{{ vendor.id }}" class="selector-label">{{ vendor.name }}</label>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
 
-    <label>Image filename (from /static/images/):</label>
-    <input name="image" placeholder="example: shoe.jpg"><br><br>
+        <div style="margin-bottom: 15px;">
+            <label>Title</label>
+            <input type="text" name="title" class="input-field" required placeholder="e.g. Running Shoes">
+        </div>
 
-    <button class="btn">Add Product</button>
-</form>
+        <div style="margin-bottom: 15px;">
+            <label>Description</label>
+            <textarea name="description" class="input-field" rows="3"></textarea>
+        </div>
 
+        <!-- Dynamic Entry for Colors and Sizes -->
+        <div style="margin-bottom: 15px;">
+            <label><strong>Available Colors</strong> (Comma separated)</label>
+            <input type="text" name="new_colors" class="input-field" placeholder="Red, Black, Navy Blue">
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <label><strong>Available Sizes</strong> (Comma separated)</label>
+            <input type="text" name="new_sizes" class="input-field" placeholder="S, M, L, XL">
+        </div>
+
+        <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+            <div style="flex: 1;">
+                <label>Price ($)</label>
+                <input type="number" step="0.01" name="price" class="input-field" required>
+            </div>
+            <div style="flex: 1;">
+                <label>Inventory</label>
+                <input type="number" name="inventory" class="input-field" required>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label>Product Image</label><br>
+            <input type="file" name="product_image" accept="image/*" required>
+        </div>
+
+        <button type="submit" class="btn" style="width: 100%; padding: 15px; font-weight: bold;">Upload Product</button>
+    </form>
+</div>
 {% endblock %}

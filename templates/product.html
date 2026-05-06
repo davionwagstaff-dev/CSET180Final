@@ -1,51 +1,132 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div style="max-width: 1200px; margin: auto; display: flex; gap: 40px; flex-wrap: wrap; padding: 20px;">
+    
+    <!-- Left: Image Gallery -->
+    <div style="flex: 1; min-width: 350px;">
+        <div class="card" style="padding: 15px; background: white; text-align: center; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            {% if images %}
+                <img id="mainImg" src="{{ url_for('static', filename='images/' + images[0].image_url) }}" 
+                     style="width: 100%; height: 450px; object-fit: contain; border-radius: 8px;">
+                
+                <div style="display: flex; gap: 10px; margin-top: 15px; overflow-x: auto;">
+                    {% for img in images %}
+                    <img src="{{ url_for('static', filename='images/' + img.image_url) }}" 
+                         style="width: 70px; height: 70px; object-fit: cover; cursor: pointer; border: 2px solid #eee; border-radius: 5px;"
+                         onclick="document.getElementById('mainImg').src=this.src">
+                    {% endfor %}
+                </div>
+            {% else %}
+                <img src="{{ url_for('static', filename='images/default.jpg') }}" style="width: 100%; border-radius: 8px;">
+            {% endif %}
+        </div>
+    </div>
 
-<div class="card">
-    <img src="{{ url_for('static', filename='images/' + (product.image_url or 'default.png')) }}" 
-     style="width:300px;">
-    <h2>{{ product.title }}</h2>
-    <p>{{ product.description }}</p>
+    <!-- Right: Details -->
+    <div style="flex: 1; min-width: 350px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+                <small style="color: #888; text-transform: uppercase;">
+                    {{ product.category_name }} | Vendor: {{ product.vendor_name }}
+                </small>
+                <h1 style="margin: 10px 0;">{{ product.title }}</h1>
+            </div>
+            
+            {% if session.get('role') == 'admin' or (session.get('role') == 'vendor' and session.get('user_id') == product.vendor_id) %}
+            <a href="{{ url_for('edit_product', id=product.id) }}" 
+               style="background: #f39c12; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                ⚙️ Edit Product
+            </a>
+            {% endif %}
+        </div>
 
-    {% if product.old_price %}
-        <p>
-            <span style="text-decoration: line-through;">${{ product.old_price }}</span>
-            <strong>${{ product.price }}</strong>
-        </p>
+        <div style="margin: 20px 0;">
+            <span style="font-size: 32px; font-weight: bold; color: #2ecc71;">${{ product.price }}</span>
+        </div>
+
+        <p style="line-height: 1.8; color: #555;">{{ product.description }}</p>
+
+        <!-- ADD TO CART FORM -->
+        <form action="/add-to-cart" method="POST" class="card" style="padding: 25px; background: #f9f9f9; border-radius: 12px;">
+            <input type="hidden" name="product_id" value="{{ product.id }}">
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                    <label style="font-weight: bold;">Color</label>
+                    <select name="color_id" required style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
+                        {% for c in colors %}
+                            <option value="{{ c.id }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-weight: bold;">Size</label>
+                    <select name="size_id" required style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
+                        {% for s in sizes %}
+                            <option value="{{ s.id }}">{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <label style="font-weight: bold;">Quantity ({{ product.inventory }} in stock)</label>
+                <input type="number" name="quantity" value="1" min="1" max="{{ product.inventory }}" 
+                       style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
+            </div>
+
+            <button type="submit" class="btn" style="width: 100%; margin-top: 25px; padding: 15px; background: #2ecc71; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                🛒 Add to Cart
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Reviews Section -->
+<div style="max-width: 800px; margin: 40px auto; padding: 0 20px;">
+    <h3 style="border-bottom: 2px solid #eee; padding-bottom: 10px;">Customer Reviews</h3>
+
+    <!-- New Review Form -->
+    {% if session.get('user_id') %}
+    <div class="card" style="margin-top: 20px; padding: 20px; background: #fff; border: 1px solid #eee;">
+        <h4 style="margin-top: 0;">Write a Review</h4>
+        <form action="{{ url_for('submit_review', product_id=product.id) }}" method="POST">
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px;">Rating</label>
+                <select name="rating" required style="width: 100%; padding: 8px;">
+                    <option value="5">5 Stars - Excellent</option>
+                    <option value="4">4 Stars - Good</option>
+                    <option value="3">3 Stars - Average</option>
+                    <option value="2">2 Stars - Poor</option>
+                    <option value="1">1 Star - Terrible</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px;">Feedback</label>
+                <textarea name="description" rows="3" required style="width: 100%; padding: 10px; box-sizing: border-box;" placeholder="Share your experience..."></textarea>
+            </div>
+            <button type="submit" class="btn" style="background: #3498db; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Post Review</button>
+        </form>
+    </div>
     {% else %}
-        <p>${{ product.price }}</p>
+    <p style="color: #888; font-style: italic; margin-top: 20px;">Please <a href="/login">login</a> to leave a review.</p>
     {% endif %}
 
-    <form method="POST" action="/add-to-cart">
-        <input type="hidden" name="product_id" value="{{ product.id }}">
-
-        <label>Quantity:</label>
-        <input type="number" name="quantity" value="1">
-
-        <br><br>
-        <button class="btn">Add to Cart</button>
-    </form>
+    <!-- Existing Reviews List -->
+    <div style="margin-top: 30px;">
+        {% for r in reviews %}
+            <div class="card" style="margin-bottom: 15px; padding: 15px; border-left: 5px solid #2ecc71; background: #fff;">
+                <div style="display: flex; justify-content: space-between;">
+                    <strong>{{ r.user_name }}</strong>
+                    <span style="color: #f1c40f;">{{ "★" * r.rating }}{{ "☆" * (5 - r.rating) }}</span>
+                </div>
+                <p style="margin: 10px 0; color: #555;">{{ r.description }}</p>
+                <small style="color: #ccc;">{{ r.created_at }}</small>
+            </div>
+        {% else %}
+            <p style="color: #999; text-align: center; margin-top: 20px;">No reviews yet. Be the first to share your thoughts!</p>
+        {% endfor %}
+    </div>
 </div>
-
-<br>
-
-<h3>Reviews</h3>
-
-{% for r in reviews %}
-<div class="card">
-    <strong>{{ r.name }}</strong> ⭐ {{ r.rating }}
-    <p>{{ r.description }}</p>
-</div>
-{% endfor %}
-
-<br>
-
-<form method="POST" action="/add-review">
-    <input type="hidden" name="product_id" value="{{ product.id }}">
-    <input name="rating" placeholder="Rating (1-5)">
-    <input name="description" placeholder="Write review">
-    <button class="btn">Submit</button>
-</form>
-
 {% endblock %}

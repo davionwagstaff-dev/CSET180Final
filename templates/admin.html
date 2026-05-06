@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="admin-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h1>Admin Dashboard</h1>
+    <span class="badge" style="background: #e1f5fe; color: #01579b; padding: 5px 12px; border-radius: 20px; font-size: 0.9em;">
+        Pending Approvals: {{ pending_users|length }}
+    </span>
+</div>
+
+<div class="card">
+    <h3>Pending Account Requests</h3>
+    <p style="color: #666; font-size: 0.9em; margin-bottom: 20px;">Review and approve new vendor or user registrations below.</p>
+
+    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+        <thead>
+            <tr style="border-bottom: 2px solid #f0f0f0;">
+                <th style="padding: 12px;">User ID</th>
+                <th style="padding: 12px;">Username</th>
+                <th style="padding: 12px;">Email</th>
+                <th style="padding: 12px;">Requested Role</th>
+                <th style="padding: 12px; text-align: right;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in pending_users %}
+            <tr style="border-bottom: 1px solid #f0f0f0;">
+                <td style="padding: 12px;">#{{ user.id }}</td>
+                <td style="padding: 12px; font-weight: 600;">{{ user.username }}</td>
+                <td style="padding: 12px;">{{ user.email }}</td>
+                <td style="padding: 12px;">
+                    <span style="text-transform: capitalize; background: #eee; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;">
+                        {{ user.role }}
+                    </span>
+                </td>
+                <td style="padding: 12px; text-align: right;">
+                    <form action="/admin/approve/{{ user.id }}" method="POST" style="display: inline;">
+                        <button type="submit" class="btn" style="background: #28a745; margin-right: 5px;">Approve</button>
+                    </form>
+                    <form action="/admin/reject/{{ user.id }}" method="POST" style="display: inline;">
+                        <button type="submit" class="btn" style="background: #dc3545;">Reject</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" style="padding: 40px; text-align: center; color: #999;">
+                    ✨ All caught up! No pending accounts to review.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

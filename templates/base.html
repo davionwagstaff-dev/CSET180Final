@@ -2,68 +2,45 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{{ title or "Shop" }}</title>
-
-    <style>
-        body {
-            margin: 0;
-            font-family: 'Segoe UI', sans-serif;
-            background: #f5f7fa;
-        }
-
-        header {
-            background: white;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-
-        nav a {
-            margin: 0 10px;
-            text-decoration: none;
-            color: #333;
-            font-weight: 500;
-        }
-
-        .container {
-            padding: 30px;
-        }
-
-        .btn {
-            padding: 10px 15px;
-            background: black;
-            color: white;
-            border: none;
-            cursor: pointer;
-            border-radius: 6px;
-        }
-
-        .card {
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.05);
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title or "Master Vendor" }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-
 <body>
 
 <header>
-    <h2>MASTER VENDOR</h2>
+    <h2 class="brand" onclick="location.href='/'">MASTER VENDOR</h2>
     <nav>
         <a href="/">Home</a>
-        <a href="/cart">Cart</a>
-        <a href="/orders">Orders</a>
-        <a href="/logout">Logout</a>
+
+        {% if session.get('user_id') %}
+            <a href="/cart">Cart</a>
+            <a href="/orders">Orders</a>
+            <a href="/my-account">My Account</a>
+
+            {% if session.get('role') in ['vendor', 'admin'] %}
+                <a href="/add-product" class="text-primary">+ Add Product</a>
+            {% endif %}
+
+            {% if session.get('role') == 'vendor' %}
+                <a href="/vendor">Vendor Panel</a>
+            {% elif session.get('role') == 'admin' %}
+                <a href="/admin">Admin Panel</a>
+            {% endif %}
+
+            <span class="role-badge">👤 {{ session.get('role') }}</span>
+            <a href="/logout" class="text-danger">Logout</a>
+
+        {% else %}
+            <a href="/login">Login</a>
+            <a href="/register" class="btn btn-small">Join</a>
+        {% endif %}
     </nav>
 </header>
 
-<div class="container">
+<main class="container">
     {% block content %}{% endblock %}
-</div>
+</main>
 
 </body>
 </html>

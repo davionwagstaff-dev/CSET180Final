@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="max-width: 1000px; margin: auto;">
+    <h2>Account Overview</h2>
+
+    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px;">
+        
+        <!-- Profile Card -->
+        <div class="card">
+            <div style="text-align: center; margin-bottom: 15px;">
+                <div style="font-size: 40px;">👤</div>
+                <h3>{{ user.name }}</h3>
+                <p style="color: #666;">@{{ user.username }}</p>
+            </div>
+            <hr>
+            <p><strong>Role:</strong> {{ user.role | upper }}</p>
+            <p><strong>Email:</strong> {{ user.email }}</p>
+        </div>
+
+        <!-- Dynamic Section -->
+        <div class="card">
+            {% if user.role == 'vendor' %}
+                <h3>Vendor Dashboard</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+                    <div style="background: #f0f4ff; padding: 20px; border-radius: 8px;">
+                        <strong>{{ stats.total_products }}</strong><br>Active Products
+                    </div>
+                    <div style="background: #f0fff4; padding: 20px; border-radius: 8px;">
+                        <strong>{{ stats.total_sold }}</strong><br>Items Sold
+                    </div>
+                </div>
+            {% else %}
+                <h3>Your Activity</h3>
+                <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <strong>Total Orders:</strong> {{ stats.total_orders }}
+                </div>
+
+                <h4>Recent Orders</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                    {% for order in stats.recent_orders %}
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 10px;">#{{ order.id }}</td>
+                        <td>${{ order.total_price }}</td>
+                        <td>{{ order.status }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3">No orders yet.</td></tr>
+                    {% endfor %}
+                </table>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
