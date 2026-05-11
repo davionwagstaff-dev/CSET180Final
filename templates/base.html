@@ -9,38 +9,65 @@
 <body>
 
 <header>
-    <h2 class="brand" onclick="location.href='/'">MASTER VENDOR</h2>
-    <nav>
-        <a href="/">Home</a>
+    <div class="header-content">
+        <h2 class="brand" onclick="location.href='/'">MASTER VENDOR</h2>
+        
+        <nav>
+            <a href="/">Home</a>
 
-        {% if session.get('user_id') %}
-            <a href="/cart">Cart</a>
-            <a href="/orders">Orders</a>
-            <a href="/my-account">My Account</a>
+            {% if session.get('user_id') %}
+                <div class="nav-group">
+                    <a href="/cart">Cart</a>
+                    <a href="/orders">Orders</a>
+                    <!-- New Link for Customer Tracking -->
+                    <a href="/my-complaints">Complaints</a>
+                </div>
 
-            {% if session.get('role') in ['vendor', 'admin'] %}
-                <a href="/add-product" class="text-primary">+ Add Product</a>
+                <div class="nav-divider"></div>
+
+                {% if session.get('role') == 'vendor' %}
+                    <div class="nav-group vendor-nav">
+                        <a href="/vendor/complaints">Manage Claims</a>
+                        <a href="/vendor">Vendor Panel</a>
+                        <a href="/add-product" class="text-primary">+ Add Product</a>
+                    </div>
+                {% elif session.get('role') == 'admin' %}
+                    <a href="/admin">Admin Panel</a>
+                {% endif %}
+
+                <div class="user-actions">
+                    <span class="role-badge">👤 {{ session.get('role').upper() }}</span>
+                    <a href="/my-account">Account</a>
+                    <a href="/logout" class="text-danger">Logout</a>
+                </div>
+
+            {% else %}
+                <div class="auth-links">
+                    <a href="/login">Login</a>
+                    <a href="/register" class="btn btn-small">Join Now</a>
+                </div>
             {% endif %}
-
-            {% if session.get('role') == 'vendor' %}
-                <a href="/vendor">Vendor Panel</a>
-            {% elif session.get('role') == 'admin' %}
-                <a href="/admin">Admin Panel</a>
-            {% endif %}
-
-            <span class="role-badge">👤 {{ session.get('role') }}</span>
-            <a href="/logout" class="text-danger">Logout</a>
-
-        {% else %}
-            <a href="/login">Login</a>
-            <a href="/register" class="btn btn-small">Join</a>
-        {% endif %}
-    </nav>
+        </nav>
+    </div>
 </header>
 
 <main class="container">
+    <!-- Flash Messages for success/error alerts -->
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
     {% block content %}{% endblock %}
 </main>
+
+<footer class="container">
+    <hr>
+    <p>&copy; 2024 Master Vendor - Support & Returns System</p>
+</footer>
 
 </body>
 </html>

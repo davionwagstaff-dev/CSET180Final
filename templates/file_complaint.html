@@ -1,0 +1,14 @@
+<h2>File a Complaint</h2>
+<form method="POST">
+    <input type="text" name="title" placeholder="Issue Title (e.g. Missing Item)" required><br><br>
+    
+    <select name="demand">
+        <option value="return">Return</option>
+        <option value="refund">Refund</option>
+        <option value="warranty">Warranty Claim</option>
+    </select><br><br>
+
+    <textarea name="description" placeholder="Describe the problem in detail..." required></textarea><br><br>
+
+    <button type="submit">Submit Complaint</button>
+</form>

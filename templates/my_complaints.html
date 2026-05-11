@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head><title>My Complaints</title></head>
+<body>
+    <h2>Your Complaint History</h2>
+    <table border="1" cellpadding="10" style="width:100%; border-collapse: collapse;">
+        <thead style="background-color: #f2f2f2;">
+            <tr>
+                <th>Date</th>
+                <th>Product</th>
+                <th>Issue</th>
+                <th>Request</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in complaints %}
+            <tr>
+                <td>{{ c.created_at.strftime('%Y-%m-%d') }}</td>
+                <td>{{ c.product_name }}</td>
+                <td>
+                    <strong>{{ c.title }}</strong><br>
+                    <small>{{ c.description }}</small>
+                </td>
+                <td>{{ c.demand.capitalize() }}</td>
+                <td>
+                    <!-- Color coding status for better UX -->
+                    {% if c.status == 'pending' %}
+                        <span style="color: orange;">⏳ Pending</span>
+                    {% elif c.status == 'confirmed' or c.status == 'complete' %}
+                        <span style="color: green;">✅ {{ c.status.capitalize() }}</span>
+                    {% elif c.status == 'rejected' %}
+                        <span style="color: red;">❌ Rejected</span>
+                    {% else %}
+                        <span>{{ c.status.capitalize() }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <br>
+    <a href="/">Back to Home</a>
+</body>
+</html>

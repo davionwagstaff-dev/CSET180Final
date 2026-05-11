@@ -1,36 +1,59 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div style="background: #f4f4f4; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
-    <form method="GET" action="/">
-        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-            <input type="text" name="search" value="{{ request.args.get('search', '') }}" placeholder="Search...">
-            
-            <select name="category">
-                <option value="">All Categories</option>
-                {% for cat in categories %}
-                <option value="{{ cat.id }}" {% if request.args.get('category') == cat.id|string %}selected{% endif %}>
-                    {{ cat.name }}
-                </option>
-                {% endfor %}
-            </select>
+<!-- Filter Bar -->
+<div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 30px; border: 1px solid #eee;">
+    <form method="GET" action="/" style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <input type="text" name="search" placeholder="Search..." value="{{ request.args.get('search', '') }}" style="padding: 8px; border-radius: 5px; border: 1px solid #ddd;">
+        
+        <select name="color" style="padding: 8px; border-radius: 5px;">
+            <option value="">All Colors</option>
+            {% for c in colors %}
+            <option value="{{ c.id }}" {% if request.args.get('color') == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+        </select>
 
-            <input type="number" name="min_price" value="{{ request.args.get('min_price', '') }}" placeholder="Min $">
-            <input type="number" name="max_price" value="{{ request.args.get('max_price', '') }}" placeholder="Max $">
+        <select name="sort" style="padding: 8px; border-radius: 5px;">x
+            <option value="newest">Newest</option>
+            <option value="rating_desc">Top Rated</option>
+            <option value="price_asc">Price: Low to High</option>
+        </select>
 
-            <button type="submit" class="btn">Filter</button>
-            <a href="/" class="btn" style="background:#ccc; color:black; text-decoration:none;">Reset</a>
-        </div>
+        <button type="submit" class="btn" style="background: #333; color: white; padding: 8px 20px; border: none; border-radius: 5px; cursor: pointer;">Filter</button>
+        <a href="/" style="padding: 8px; color: #666; text-decoration: none;">Reset</a>
     </form>
 </div>
 
-<div class="grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px;">
+<!-- Product Grid -->
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px;">
 {% for p in products %}
-    <div class="card" style="text-align: center; border: 1px solid #ddd; padding: 15px; border-radius: 8px;">
-        <img src="{{ url_for('static', filename='images/' + (p.image_url or 'default.jpg')) }}" style="width: 100%; height: 200px; object-fit: contain;">
-        <h3>{{ p.title }}</h3>
-        <p><strong>${{ p.price }}</strong></p>
-        <a href="{{ url_for('product_page', id=p.id) }}" class="btn">View Details</a>
+    <div style="background: white; border: 1px solid #eee; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+        
+        <img src="{{ url_for('static', filename='images/' + (p.image_url or 'default.jpg')) }}" style="width: 100%; height: 200px; object-fit: contain; margin-bottom: 15px;">
+        
+        <h3 style="margin: 10px 0; font-size: 1.2rem;">{{ p.title }}</h3>
+        
+        <p style="color: #f1c40f; margin: 5px 0;">
+            {{ "★" * p.avg_rating|int }}{{ "☆" * (5 - p.avg_rating|int) }}
+            <span style="color: #888; font-size: 0.9rem;">({{ "%.1f"|format(p.avg_rating) }})</span>
+        </p>
+
+        <p style="font-size: 1.3rem; font-weight: bold; color: #2ecc71; margin: 10px 0;">${{ p.price }}</p>
+
+        <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px;">
+            <a href="{{ url_for('product_page', id=p.id) }}" style="background: #f0f2f5; color: #333; text-decoration: none; padding: 10px; border-radius: 6px; font-weight: bold;">View Details</a>
+
+            <!-- OWNER CONTROLS SECTION -->
+            {% if session.get('role') == 'admin' or session.get('user_id')|int == p.vendor_id|int %}
+            <div style="display: flex; gap: 8px; border-top: 1px solid #eee; pt: 15px; margin-top: 5px; padding-top: 10px;">
+                <a href="{{ url_for('edit_product', id=p.id) }}" style="flex: 1; background: #f39c12; color: white; text-decoration: none; padding: 8px; border-radius: 6px; font-size: 0.9rem;">Edit</a>
+                
+                <form action="{{ url_for('delete_product', id=p.id) }}" method="POST" style="flex: 1;" onsubmit="return confirm('Delete this product permanently?');">
+                    <button type="submit" style="width: 100%; background: #e74c3c; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Delete</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
     </div>
 {% endfor %}
 </div>

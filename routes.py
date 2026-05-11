@@ -2,6 +2,7 @@ import os
 from werkzeug.utils import secure_filename
 from flask import Flask, render_template, request, redirect, session, url_for
 from sqlalchemy import create_engine, text
+from datetime import datetime
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'static/images'
@@ -67,114 +68,7 @@ def logout():
     return redirect('/login')
 
 
-@app.route('/product/<int:id>')
-def product_page(id):
-    with engine.connect() as conn:
-        # 1. Fetch Product with Mappings
-        product = conn.execute(text("""
-            SELECT p.*, c.name as category_name, v.name as vendor_name
-            FROM products p
-            LEFT JOIN categories c ON p.category_id = c.id
-            LEFT JOIN users v ON p.vendor_id = v.id
-            WHERE p.id = :id
-        """), {"id": id}).mappings().fetchone()
 
-        if not product:
-            return "Product not found", 404
-
-        # 2. Fetch images (mappings so we can use img['image_url'])
-        images = conn.execute(text("""
-            SELECT image_url FROM product_images WHERE product_id = :id
-        """), {"id": id}).mappings().fetchall()
-
-        # 3. Fetch Colors & Sizes
-        colors = conn.execute(text("""
-            SELECT c.id, c.name FROM colors c 
-            JOIN product_colors pc ON c.id = pc.color_id 
-            WHERE pc.product_id = :id
-        """), {"id": id}).mappings().fetchall()
-
-        sizes = conn.execute(text("""
-            SELECT s.id, s.name FROM sizes s 
-            JOIN product_sizes ps ON s.id = ps.size_id 
-            WHERE ps.product_id = :id
-        """), {"id": id}).mappings().fetchall()
-
-        # 4. Fetch Reviews
-        reviews = conn.execute(text("""
-            SELECT r.*, u.name as user_name FROM reviews r 
-            JOIN users u ON r.user_id = u.id 
-            WHERE product_id = :id
-        """), {"id": id}).mappings().fetchall()
-
-    return render_template('product.html', product=product, images=images, colors=colors, sizes=sizes, reviews=reviews)
-
-
-
-@app.route('/edit-product/<int:id>', methods=['GET', 'POST'])
-def edit_product(id):
-    if 'user_id' not in session or session.get('role') not in ['admin', 'vendor']:
-        return redirect('/login')
-
-    with engine.connect() as conn:
-        # 1. Fetch Product
-        product = conn.execute(text("SELECT * FROM products WHERE id = :id"), {"id": id}).mappings().fetchone()
-        
-        if not product:
-            return "Product not found", 404
-        if session['role'] == 'vendor' and product['vendor_id'] != session['user_id']:
-            return "Unauthorized", 403
-
-        if request.method == 'POST':
-            # 2. Update Main Product Table
-            conn.execute(text("""
-                UPDATE products 
-                SET title=:t, description=:d, price=:p, category_id=:cid, inventory=:inv 
-                WHERE id=:id
-            """), {
-                "t": request.form.get('title'), "d": request.form.get('description'),
-                "p": request.form.get('price'), "cid": request.form.get('category_id'),
-                "inv": request.form.get('inventory'), "id": id
-            })
-
-            # 3. Handle Colors (Clears old links, adds new ones)
-            raw_colors = request.form.get('new_colors', '')
-            conn.execute(text("DELETE FROM product_colors WHERE product_id = :id"), {"id": id})
-            if raw_colors:
-                color_list = [c.strip() for c in raw_colors.split(',') if c.strip()]
-                for name in color_list:
-                    conn.execute(text("INSERT IGNORE INTO colors (name) VALUES (:n)"), {"n": name})
-                    c_id = conn.execute(text("SELECT id FROM colors WHERE name = :n"), {"n": name}).scalar()
-                    conn.execute(text("INSERT INTO product_colors (product_id, color_id) VALUES (:pid, :cid)"), {"pid": id, "cid": c_id})
-
-            # 4. Handle Sizes
-            raw_sizes = request.form.get('new_sizes', '')
-            conn.execute(text("DELETE FROM product_sizes WHERE product_id = :id"), {"id": id})
-            if raw_sizes:
-                size_list = [s.strip() for s in raw_sizes.split(',') if s.strip()]
-                for name in size_list:
-                    conn.execute(text("INSERT IGNORE INTO sizes (name) VALUES (:n)"), {"n": name})
-                    s_id = conn.execute(text("SELECT id FROM sizes WHERE name = :n"), {"n": name}).scalar()
-                    conn.execute(text("INSERT INTO product_sizes (product_id, size_id) VALUES (:pid, :sid)"), {"pid": id, "sid": s_id})
-
-            conn.commit()
-            return redirect(url_for('product_page', id=id))
-
-        # GET: Prepare form data
-        categories = conn.execute(text("SELECT id, name FROM categories")).mappings().all()
-        
-        # Get existing colors/sizes as strings for the input boxes
-        curr_colors = conn.execute(text("""
-            SELECT GROUP_CONCAT(c.name SEPARATOR ', ') FROM colors c 
-            JOIN product_colors pc ON c.id = pc.color_id WHERE pc.product_id = :id
-        """), {"id": id}).scalar() or ""
-
-        curr_sizes = conn.execute(text("""
-            SELECT GROUP_CONCAT(s.name SEPARATOR ', ') FROM sizes s 
-            JOIN product_sizes ps ON s.id = ps.size_id WHERE ps.product_id = :id
-        """), {"id": id}).scalar() or ""
-
-    return render_template('edit_product.html', product=product, categories=categories, curr_colors=curr_colors, curr_sizes=curr_sizes)
 
 
 
@@ -377,72 +271,73 @@ def chat(receiver_id):
             "me": session['user_id'],
             "them": receiver_id
         }).fetchall()
+    return render_template('chat.html', messages=messages, receiver_id=receiver_id)
+# --- HOME ROUTE (INDEX) ---
+@app.route('/')
+def home():
+    # 1. Capture filters from request
+    search = request.args.get('search', '')
+    category_id = request.args.get('category')
+    color_id = request.args.get('color')
+    sort = request.args.get('sort')
+
+    # 2. Main Query - MUST include p.vendor_id for the HTML button check to work!
+    query_str = """
+        SELECT p.id, p.title, p.price, p.vendor_id,
+               IFNULL(AVG(r.rating), 0) AS avg_rating,
+               (SELECT image_url FROM product_images WHERE product_id = p.id LIMIT 1) as image_url
+        FROM products p
+        LEFT JOIN reviews r ON p.id = r.product_id
+        LEFT JOIN product_colors pc ON p.id = pc.product_id
+        WHERE 1=1
+    """
+    params = {}
+
+    if search:
+        query_str += " AND (p.title LIKE :s OR p.description LIKE :s)"
+        params['s'] = f"%{search}%"
+    if category_id:
+        query_str += " AND p.category_id = :cid"
+        params['cid'] = category_id
+    if color_id:
+        query_str += " AND pc.color_id = :color_id"
+        params['color_id'] = color_id
+
+    query_str += " GROUP BY p.id"
+
+    # Sorting
+    if sort == 'rating_desc': query_str += " ORDER BY avg_rating DESC"
+    elif sort == 'price_asc': query_str += " ORDER BY p.price ASC"
+    else: query_str += " ORDER BY p.created_at DESC"
+
+    with engine.connect() as conn:
+        products = conn.execute(text(query_str), params).mappings().all()
+        categories = conn.execute(text("SELECT * FROM categories")).mappings().all()
+        colors = conn.execute(text("SELECT * FROM colors")).mappings().all()
+
+    return render_template('home.html', products=products, categories=categories, colors=colors)
+
+
 @app.route('/delete-product/<int:id>', methods=['POST'])
 def delete_product(id):
     if 'user_id' not in session:
         return redirect('/login')
 
     with engine.connect() as conn:
-        product = conn.execute(text("""
-            SELECT vendor_id FROM products WHERE id=:id
-        """), {"id": id}).fetchone()
-
-        if not product:
-            return "Product not found"
-
-        # Admin OR owner vendor
-        if session.get('role') != 'admin' and product.vendor_id != session['user_id']:
-            return "Unauthorized"
-
-        conn.execute(text("DELETE FROM products WHERE id=:id"), {"id": id})
-        conn.commit()
-
-    return redirect('/')
-@app.route('/')
-def home():
-    # Get filter values
-    search = request.args.get('search', '')
-    cat_id = request.args.get('category', '')
-    min_price = request.args.get('min_price', '')
-    max_price = request.args.get('max_price', '')
-
-    # FIX: We use MIN(pi.image_url) so MySQL picks one image per product
-    query = """
-        SELECT 
-            p.id, 
-            p.title, 
-            p.price, 
-            p.vendor_id, 
-            MIN(pi.image_url) as image_url
-        FROM products p
-        LEFT JOIN product_images pi ON p.id = pi.product_id
-        WHERE 1=1
-    """
-    params = {}
-
-    if search:
-        query += " AND (p.title LIKE :search OR p.description LIKE :search)"
-        params['search'] = f"%{search}%"
-    
-    if cat_id:
-        query += " AND p.category_id = :cat_id"
-        params['cat_id'] = cat_id
+        product = conn.execute(text("SELECT vendor_id FROM products WHERE id = :id"), {"id": id}).mappings().fetchone()
         
-    if min_price:
-        query += " AND p.price >= :min_price"
-        params['min_price'] = min_price
+        if not product: return "Not found", 404
         
-    if max_price:
-        query += " AND p.price <= :max_price"
-        params['max_price'] = max_price
+        # Security: Only Admin or the Vendor who owns the item
+        if session.get('role') == 'admin' or session.get('user_id')|int == product['vendor_id']|int:
+            with engine.begin() as trans_conn:
+                trans_conn.execute(text("DELETE FROM products WHERE id = :id"), {"id": id})
+            return redirect(url_for('index'))
+        
+        return "Unauthorized", 403
 
-    query += " GROUP BY p.id"
 
-    with engine.connect() as conn:
-        products = conn.execute(text(query), params).mappings().all()
-        categories = conn.execute(text("SELECT * FROM categories")).mappings().all()
 
-    return render_template('home.html', products=products, categories=categories)
 
 
 
@@ -473,110 +368,167 @@ def approve_user(user_id):
 
 @app.route('/my-account')
 def my_account():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    user_id = session['user_id']
-    role = session.get('role')
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect('/login')
 
     with engine.connect() as conn:
-        # 1. Fetch User Info
-        user_query = text("SELECT name, email, username, role, created_at FROM users WHERE id = :uid")
-        user_info = conn.execute(user_query, {"uid": user_id}).mappings().fetchone()
+        user = conn.execute(text("SELECT * FROM users WHERE id = :id"), {"id": user_id}).mappings().fetchone()
+        stats = {}
 
-        stats_data = {}
-
-        if role == 'vendor':
-            # Get vendor stats
-            prod_query = text("SELECT COUNT(*) as count FROM products WHERE vendor_id = :uid")
-            stats_data['total_products'] = conn.execute(prod_query, {"uid": user_id}).scalar() or 0
+        if user.role == 'vendor':
+            # Vendor Stats
+            stats['total_products'] = conn.execute(text("SELECT COUNT(*) FROM products WHERE vendor_id = :id"), {"id": user_id}).scalar()
+            stats['total_sold'] = conn.execute(text("SELECT IFNULL(SUM(quantity), 0) FROM order_items WHERE vendor_id = :id"), {"id": user_id}).scalar()
             
-            sold_query = text("SELECT SUM(quantity) as sold FROM order_items WHERE vendor_id = :uid")
-            stats_data['total_sold'] = conn.execute(sold_query, {"uid": user_id}).scalar() or 0
-        
+            # Incoming Orders for Vendor
+            stats['customer_orders'] = conn.execute(text("""
+                SELECT oi.*, p.title as product_title, o.status, o.created_at, u.name as customer_name
+                FROM order_items oi
+                JOIN orders o ON oi.order_id = o.id
+                JOIN products p ON oi.product_id = p.id
+                JOIN users u ON o.user_id = u.id
+                WHERE oi.vendor_id = :id
+                ORDER BY o.created_at DESC
+            """), {"id": user_id}).mappings().all()
         else:
-            # Get customer stats (order count and recent orders)
-            count_query = text("SELECT COUNT(*) FROM orders WHERE user_id = :uid")
-            stats_data['total_orders'] = conn.execute(count_query, {"uid": user_id}).scalar() or 0
-            
-            orders_query = text("""
-                SELECT id, total_price, status, created_at 
-                FROM orders WHERE user_id = :uid 
-                ORDER BY created_at DESC LIMIT 5
-            """)
-            stats_data['recent_orders'] = conn.execute(orders_query, {"uid": user_id}).mappings().all()
+            # Customer Stats
+            stats['total_orders'] = conn.execute(text("SELECT COUNT(*) FROM orders WHERE user_id = :id"), {"id": user_id}).scalar()
+            stats['recent_orders'] = conn.execute(text("SELECT * FROM orders WHERE user_id = :id ORDER BY created_at DESC"), {"id": user_id}).mappings().all()
 
-    # Pass 'stats_data' AS 'stats' to the template
-    return render_template('my_account.html', user=user_info, stats=stats_data)
+    return render_template('my_account.html', user=user, stats=stats)
 
+
+# --- VIEW PRODUCT ---
+@app.route('/product/<int:id>')
+def product_page(id):
+    with engine.connect() as conn:
+        # Fetch product with AVG rating and Vendor details
+        product = conn.execute(text("""
+            SELECT p.*, c.name as category_name, v.name as vendor_name,
+                   IFNULL(AVG(r.rating), 0) as avg_rating,
+                   COUNT(r.id) as review_count
+            FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN users v ON p.vendor_id = v.id
+            LEFT JOIN reviews r ON p.id = r.product_id
+            WHERE p.id = :id
+            GROUP BY p.id
+        """), {"id": id}).mappings().fetchone()
+
+        if not product: return "Product not found", 404
+
+        # Fetch supporting data
+        images = conn.execute(text("SELECT image_url FROM product_images WHERE product_id = :id"), {"id": id}).mappings().all()
+        colors = conn.execute(text("SELECT c.id, c.name FROM colors c JOIN product_colors pc ON c.id = pc.color_id WHERE pc.product_id = :id"), {"id": id}).mappings().all()
+        sizes = conn.execute(text("SELECT s.id, s.name FROM sizes s JOIN product_sizes ps ON s.id = ps.size_id WHERE ps.product_id = :id"), {"id": id}).mappings().all()
+        reviews = conn.execute(text("SELECT r.*, u.name as user_name FROM reviews r JOIN users u ON r.user_id = u.id WHERE product_id = :id ORDER BY created_at DESC"), {"id": id}).mappings().all()
+
+    return render_template('product.html', product=product, images=images, colors=colors, sizes=sizes, reviews=reviews)
+
+
+# --- ADD PRODUCT ---
 @app.route('/add-product', methods=['GET', 'POST'])
 def add_product():
     if 'user_id' not in session or session.get('role') not in ['admin', 'vendor']:
         return redirect('/login')
 
-    with engine.connect() as conn:
-        if request.method == 'POST':
-            # 1. Vendor Logic
-            vendor_id = request.form.get('vendor_id') if session.get('role') == 'admin' else session['user_id']
-            
-            # 2. File Handling
-            file = request.files.get('product_image')
-            filename = 'default.jpg'
-            if file and file.filename != '':
-                filename = secure_filename(file.filename)
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-
-            # 3. Insert Main Product
-            result = conn.execute(text("""
-                INSERT INTO products (vendor_id, title, description, price, category_id, inventory)
-                VALUES (:vid, :t, :d, :p, :cid, :inv)
+    if request.method == 'POST':
+        with engine.begin() as conn:
+            # 1. Insert Main Product
+            res = conn.execute(text("""
+                INSERT INTO products (vendor_id, title, description, price, old_price, discount_start, discount_end, inventory, category_id)
+                VALUES (:v_id, :t, :d, :p, :op, :ds, :de, :inv, :cid)
             """), {
-                "vid": vendor_id, 
-                "t": request.form.get('title'), 
-                "d": request.form.get('description'),
-                "p": request.form.get('price'), 
-                "cid": request.form.get('category_id'), 
-                "inv": request.form.get('inventory')
+                "v_id": session['user_id'], "t": request.form.get('title'), "d": request.form.get('description'),
+                "p": request.form.get('price'), "op": request.form.get('old_price') or None,
+                "ds": request.form.get('discount_start') or None, "de": request.form.get('discount_end') or None,
+                "inv": request.form.get('inventory'), "cid": request.form.get('category_id')
             })
-            new_id = result.lastrowid
-            
-            # 4. Link Image
-            conn.execute(text("INSERT INTO product_images (product_id, image_url) VALUES (:pid, :url)"),
-                         {"pid": new_id, "url": filename})
+            product_id = res.lastrowid
 
-            # 5. Process Colors (e.g., "Red, Blue")
-            raw_colors = request.form.get('new_colors', '')
-            if raw_colors:
-                color_list = [c.strip() for c in raw_colors.split(',') if c.strip()]
-                for color_name in color_list:
-                    # Insert if not exists (Requires UNIQUE constraint on colors.name)
-                    conn.execute(text("INSERT IGNORE INTO colors (name) VALUES (:n)"), {"n": color_name})
-                    # Get ID
-                    c_id = conn.execute(text("SELECT id FROM colors WHERE name = :n"), {"n": color_name}).scalar()
-                    # Link
-                    conn.execute(text("INSERT IGNORE INTO product_colors (product_id, color_id) VALUES (:pid, :cid)"),
-                                 {"pid": new_id, "cid": c_id})
+            # 2. Handle Image
+            file = request.files.get('image')
+            if file and file.filename != '':
+                filename = secure_filename(f"{product_id}_{file.filename}")
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                conn.execute(text("INSERT INTO product_images (product_id, image_url) VALUES (:pid, :url)"), {"pid": product_id, "url": filename})
 
-            # 6. Process Sizes
-            raw_sizes = request.form.get('new_sizes', '')
-            if raw_sizes:
-                size_list = [s.strip() for s in raw_sizes.split(',') if s.strip()]
-                for size_name in size_list:
-                    conn.execute(text("INSERT IGNORE INTO sizes (name) VALUES (:n)"), {"n": size_name})
-                    s_id = conn.execute(text("SELECT id FROM sizes WHERE name = :n"), {"n": size_name}).scalar()
-                    conn.execute(text("INSERT IGNORE INTO product_sizes (product_id, size_id) VALUES (:pid, :sid)"),
-                                 {"pid": new_id, "sid": s_id})
+            # 3. Handle Colors & Sizes (Comma Separated)
+            for key, table, link_table, col_name in [('colors', 'colors', 'product_colors', 'color_id'), ('sizes', 'sizes', 'product_sizes', 'size_id')]:
+                items = [i.strip() for i in request.form.get(key, '').split(',') if i.strip()]
+                for item in items:
+                    conn.execute(text(f"INSERT IGNORE INTO {table} (name) VALUES (:n)"), {"n": item})
+                    item_id = conn.execute(text(f"SELECT id FROM {table} WHERE name = :n"), {"n": item}).scalar()
+                    conn.execute(text(f"INSERT INTO {link_table} (product_id, {col_name}) VALUES (:pid, :iid)"), {"pid": product_id, "iid": item_id})
 
-            conn.commit()
-            return redirect('/')
+        return redirect(url_for('product_page', id=product_id))
 
-        # GET: Fetch form data
-        categories = conn.execute(text("SELECT id, name FROM categories")).mappings().all()
-        vendors = []
-        if session.get('role') == 'admin':
-            vendors = conn.execute(text("SELECT id, name FROM users WHERE role = 'vendor'")).mappings().all()
+    with engine.connect() as conn:
+        categories = conn.execute(text("SELECT * FROM categories")).mappings().all()
+    return render_template('add_product.html', categories=categories)
 
-    return render_template('add_product.html', categories=categories, vendors=vendors)
+
+# --- EDIT PRODUCT ---
+@app.route('/edit-product/<int:id>', methods=['GET', 'POST'])
+def edit_product(id):
+    if 'user_id' not in session or session.get('role') not in ['admin', 'vendor']:
+        return redirect('/login')
+
+    with engine.connect() as conn:
+        # 1. Fetch Product
+        product = conn.execute(text("SELECT * FROM products WHERE id = :id"), {"id": id}).mappings().fetchone()
+        
+        if not product:
+            return "Product not found", 404
+        if session['role'] == 'vendor' and product['vendor_id'] != session['user_id']:
+            return "Unauthorized", 403
+
+        if request.method == 'POST':
+            with engine.begin() as edit_conn:
+                # 2. Update Main Product Table
+                edit_conn.execute(text("""
+                    UPDATE products 
+                    SET title=:t, description=:d, price=:p, old_price=:op,
+                        discount_start=:ds, discount_end=:de, category_id=:cid, inventory=:inv 
+                    WHERE id=:id
+                """), {
+                    "t": request.form.get('title'), "d": request.form.get('description'),
+                    "p": request.form.get('price'), "op": request.form.get('old_price') or None,
+                    "ds": request.form.get('discount_start') or None, "de": request.form.get('discount_end') or None,
+                    "cid": request.form.get('category_id'), "inv": request.form.get('inventory'), "id": id
+                })
+
+                # 3. Handle Colors & Sizes (Clear and Re-sync)
+                for key, table, link_table, col_name in [
+                    ('colors', 'colors', 'product_colors', 'color_id'),
+                    ('sizes', 'sizes', 'product_sizes', 'size_id')
+                ]:
+                    edit_conn.execute(text(f"DELETE FROM {link_table} WHERE product_id = :id"), {"id": id})
+                    items = [i.strip() for i in request.form.get(key, '').split(',') if i.strip()]
+                    for item in items:
+                        edit_conn.execute(text(f"INSERT IGNORE INTO {table} (name) VALUES (:n)"), {"n": item})
+                        item_id = edit_conn.execute(text(f"SELECT id FROM {table} WHERE name = :n"), {"n": item}).scalar()
+                        edit_conn.execute(text(f"INSERT INTO {link_table} (product_id, {col_name}) VALUES (:pid, :iid)"), {"pid": id, "iid": item_id})
+
+            return redirect(url_for('product_page', id=id))
+
+        # GET: Prepare form data
+        categories = conn.execute(text("SELECT * FROM categories")).mappings().all()
+        
+        # FIXED: Corrected Aliases (pc for colors, ps for sizes)
+        curr_colors = conn.execute(text("""
+            SELECT GROUP_CONCAT(c.name SEPARATOR ', ') FROM colors c 
+            JOIN product_colors pc ON c.id = pc.color_id WHERE pc.product_id = :id
+        """), {"id": id}).scalar() or ""
+
+        curr_sizes = conn.execute(text("""
+            SELECT GROUP_CONCAT(s.name SEPARATOR ', ') FROM sizes s 
+            JOIN product_sizes ps ON s.id = ps.size_id WHERE ps.product_id = :id
+        """), {"id": id}).scalar() or ""
+
+    return render_template('edit_product.html', product=product, categories=categories, colors=curr_colors, sizes=curr_sizes)
+
 @app.route('/place-order', methods=['POST'])
 def place_order():
     user_id = session.get('user_id')
@@ -687,9 +639,91 @@ def submit_review(product_id):
         })
 
     return redirect(url_for('product_page', id=product_id))
+# CUSTOMER: Submit a complaint
+@app.route('/complaint/new/<int:order_item_id>', methods=['GET', 'POST'])
+def file_complaint(order_item_id):
+    if 'user_id' not in session: return redirect('/login')
+
+    if request.method == 'POST':
+        with engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO complaints (user_id, order_item_id, title, description, demand, status)
+                VALUES (:u_id, :oi_id, :t, :d, :dem, 'pending')
+            """), {
+                "u_id": session['user_id'], 
+                "oi_id": order_item_id, 
+                "t": request.form['title'], 
+                "d": request.form['description'], 
+                "dem": request.form['demand']
+            })
+            conn.commit()
+        return redirect('/my-complaints')
+
+    return render_template('file_complaint.html', order_item_id=order_item_id)
+
+# VENDOR: View complaints for their products
+@app.route('/vendor/complaints')
+def vendor_complaints():
+    if session.get('role') != 'vendor': return "Access Denied"
+
+    with engine.connect() as conn:
+        query = text("""
+            SELECT c.*, p.title as product_name, u.name as customer_name
+            FROM complaints c
+            JOIN order_items oi ON c.order_item_id = oi.id
+            JOIN products p ON oi.product_id = p.id
+            JOIN users u ON c.user_id = u.id
+            WHERE oi.vendor_id = :vendor_id
+        """)
+        results = conn.execute(query, {"vendor_id": session['user_id']}).fetchall()
+    return render_template('vendor_complaints.html', complaints=results)
+
+# BOTH: Update status (Vendor or Admin)
+@app.route('/complaint/update/<int:complaint_id>', methods=['POST'])
+def update_complaint_status(complaint_id):
+    new_status = request.form['status']
+    with engine.connect() as conn:
+        conn.execute(text("UPDATE complaints SET status = :status WHERE id = :id"),
+                    {"status": new_status, "id": complaint_id})
+        conn.commit()
+    return redirect(request.referrer)
+
+@app.route('/my-complaints')
+def my_complaints():
+    if 'user_id' not in session: return redirect('/login')
+    with engine.connect() as conn:
+        query = text("""
+            SELECT c.*, p.title as product_name 
+            FROM complaints c
+            JOIN order_items oi ON c.order_item_id = oi.id
+            JOIN products p ON oi.product_id = p.id
+            WHERE c.user_id = :u_id
+            ORDER BY c.created_at DESC
+        """)
+        results = conn.execute(query, {"u_id": session['user_id']}).fetchall()
+    return render_template('my_complaints.html', complaints=results)
+
+
+@app.route('/ship-order/<int:order_id>', methods=['POST'])
+def ship_order(order_id):
+    # 1. Security check: make sure user is logged in and is a vendor
+    if 'user_id' not in session or session.get('role') != 'vendor':
+        return redirect('/login')
+
+    with engine.begin() as conn:
+        # 2. Update the status of the order to 'shipped'
+        conn.execute(text("""
+            UPDATE orders 
+            SET status = 'shipped' 
+            WHERE id = :oid
+        """), {"oid": order_id})
+        
+    # 3. Redirect back to the account page to see the updated status
+    return redirect(url_for('my_account'))
+
 
 
 if __name__ == '__main__':  # When this file is run...
     # ... start the app in debug mode. In debug mode,
-    # server is automatically restarted when you make changes to the code
+    # server is automatically restarted when you make changes to the codex
     app.run(debug=True)

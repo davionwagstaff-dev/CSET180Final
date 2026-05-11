@@ -1,93 +1,61 @@
 {% extends "base.html" %}
-
 {% block content %}
-<style>
-    .selector-input { display: none; }
-    .selector-label {
-        display: inline-block;
-        padding: 8px 16px;
-        margin: 5px;
-        border: 1px solid #ddd;
-        border-radius: 20px;
-        background: white;
-        cursor: pointer;
-        transition: 0.2s;
-        font-size: 14px;
-    }
-    .selector-input:checked + .selector-label {
-        background: black;
-        color: white;
-        border-color: black;
-    }
-    .selector-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
-    .input-field { width: 95%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 8px; }
-</style>
-
-<div class="card" style="max-width: 650px; margin: auto;">
-    <h2>Add New Product</h2>
-    <form action="/add-product" method="POST" enctype="multipart/form-data">
+<div class="card" style="max-width: 700px; margin: 40px auto; padding: 40px;">
+    <h2>{{ 'Edit' if product else 'Add' }} Product</h2>
+    <hr>
+    <form method="POST" enctype="multipart/form-data">
+        <label>Product Title</label>
+        <input type="text" name="title" value="{{ product.title if product else '' }}" required class="input-field" style="width: 100%; margin-bottom: 20px; padding: 10px;">
         
-        <!-- Category Selection -->
-        <div style="margin-bottom: 25px;">
-            <label><strong>Select Category</strong></label>
-            <div class="selector-container">
-                {% for cat in categories %}
-                    <input type="radio" name="category_id" id="cat_{{ cat.id }}" value="{{ cat.id }}" class="selector-input" required>
-                    <label for="cat_{{ cat.id }}" class="selector-label">{{ cat.name }}</label>
-                {% endfor %}
+        <label>Description</label>
+        <textarea name="description" class="input-field" rows="4" style="width: 100%; margin-bottom: 20px; padding: 10px;">{{ product.description if product else '' }}</textarea>
+
+        <div style="display: flex; gap: 20px;">
+            <div style="flex: 1;">
+                <label>Sale Price ($)</label>
+                <input type="number" step="0.01" name="price" value="{{ product.price if product else '' }}" required class="input-field" style="width: 100%; margin-bottom: 20px; padding: 10px;">
+            </div>
+            <div style="flex: 1;">
+                <label>Regular Price ($) (Optional)</label>
+                <input type="number" step="0.01" name="old_price" value="{{ product.old_price if product else '' }}" class="input-field" style="width: 100%; margin-bottom: 20px; padding: 10px;">
             </div>
         </div>
 
-        {% if session.get('role') == 'admin' %}
-        <div style="margin-bottom: 25px;">
-            <label><strong>Assign to Vendor</strong></label>
-            <div class="selector-container">
-                {% for vendor in vendors %}
-                    <input type="radio" name="vendor_id" id="ven_{{ vendor.id }}" value="{{ vendor.id }}" class="selector-input" required>
-                    <label for="ven_{{ vendor.id }}" class="selector-label">{{ vendor.name }}</label>
-                {% endfor %}
+        <div style="display: flex; gap: 20px;">
+            <div style="flex: 1;">
+                <label>Discount Start</label>
+                <input type="datetime-local" name="discount_start" value="{{ product.discount_start if product else '' }}" class="input-field" style="width: 100%; margin-bottom: 20px; padding: 10px;">
+            </div>
+            <div style="flex: 1;">
+                <label>Discount End</label>
+                <input type="datetime-local" name="discount_end" value="{{ product.discount_end if product else '' }}" class="input-field" style="width: 100%; margin-bottom: 20px; padding: 10px;">
             </div>
         </div>
+
+        <label>Category</label>
+        <select name="category_id" class="input-field" style="width: 100%; margin-bottom: 20px; padding: 10px;">
+            {% for cat in categories %}
+            <option value="{{ cat.id }}" {% if product and product.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Available Colors (e.g. Red, Blue, Black)</label>
+        <input type="text" name="colors" value="{{ colors if colors else '' }}" class="input-field" style="width: 100%; margin-bottom: 20px; padding: 10px;">
+
+        <label>Available Sizes (e.g. S, M, L, XL)</label>
+        <input type="text" name="sizes" value="{{ sizes if sizes else '' }}" class="input-field" style="width: 100%; margin-bottom: 20px; padding: 10px;">
+
+        <label>Initial Stock Count</label>
+        <input type="number" name="inventory" value="{{ product.inventory if product else 0 }}" class="input-field" style="width: 100%; margin-bottom: 20px; padding: 10px;">
+
+        {% if not product %}
+        <label>Primary Image</label>
+        <input type="file" name="image" class="input-field" style="width: 100%; margin-bottom: 20px;">
         {% endif %}
 
-        <div style="margin-bottom: 15px;">
-            <label>Title</label>
-            <input type="text" name="title" class="input-field" required placeholder="e.g. Running Shoes">
-        </div>
-
-        <div style="margin-bottom: 15px;">
-            <label>Description</label>
-            <textarea name="description" class="input-field" rows="3"></textarea>
-        </div>
-
-        <!-- Dynamic Entry for Colors and Sizes -->
-        <div style="margin-bottom: 15px;">
-            <label><strong>Available Colors</strong> (Comma separated)</label>
-            <input type="text" name="new_colors" class="input-field" placeholder="Red, Black, Navy Blue">
-        </div>
-
-        <div style="margin-bottom: 15px;">
-            <label><strong>Available Sizes</strong> (Comma separated)</label>
-            <input type="text" name="new_sizes" class="input-field" placeholder="S, M, L, XL">
-        </div>
-
-        <div style="display: flex; gap: 15px; margin-bottom: 15px;">
-            <div style="flex: 1;">
-                <label>Price ($)</label>
-                <input type="number" step="0.01" name="price" class="input-field" required>
-            </div>
-            <div style="flex: 1;">
-                <label>Inventory</label>
-                <input type="number" name="inventory" class="input-field" required>
-            </div>
-        </div>
-
-        <div style="margin-bottom: 20px;">
-            <label>Product Image</label><br>
-            <input type="file" name="product_image" accept="image/*" required>
-        </div>
-
-        <button type="submit" class="btn" style="width: 100%; padding: 15px; font-weight: bold;">Upload Product</button>
+        <button type="submit" class="btn" style="width: 100%; background: #3498db; color: white; padding: 15px; border: none; font-weight: bold; cursor: pointer;">
+            {{ 'Update Product' if product else 'Publish Product' }}
+        </button>
     </form>
 </div>
 {% endblock %}
